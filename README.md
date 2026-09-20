@@ -1,8 +1,8 @@
-💧 Daily Water
-Aplicativo web interativo desenvolvido em Python para o monitoramento personalizado da hidratação diária, cálculo de metas hídricas individuais e controle de alarmes de rotina.
+💧 Daily Water:
+O que é: Aplicativo web interativo para o monitoramento personalizado do consummo de água diária.
 
 🚀 Sobre o Projeto
-O Daily Water foi concebido com o objetivo de auxiliar os usuários a manterem um consumo hídrico adequado às necessidades de seus corpos, evitando tanto a desidratação quanto os riscos associados ao consumo excessivo de água. O sistema calcula a faixa ideal e o limite máximo seguro com base no peso corporal do usuário, integrando um painel de controle diário e relatórios mensais consolidados.
+O Daily Water foi feito com o objetivo de auxiliar os usuários a manterem um consumo hídrico adequado às necessidades de seus corpos, evitando tanto a desidratação quanto os riscos associados ao consumo excessivo de água. O sistema calcula a faixa ideal e o limite máximo seguro com base no peso corporal do usuário, integrando um painel de controle diário e relatórios mensais consolidados.
 
 ✨ Funcionalidades
 Cálculo Personalizado de Metas: Definição da meta diária de consumo hídrico e do limite máximo seguro baseados no peso do usuário.
@@ -51,7 +51,7 @@ Entre na pasta do projeto:
 
 Bash
 cd daily-water
-Crie e ative um ambiente virtual (opcional, mas recomendado):
+Crie e ative um ambiente virtual:
 
 Bash
 python -m venv venv
