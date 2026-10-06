@@ -4,6 +4,14 @@ import numpy as np
 from datetime import datetime, date
 import os
 import plotly.graph_objects as go
+import re
+
+# ---------------------------------------------------------
+# FUNÇÃO DE VALIDAÇÃO DE E-MAIL
+# ---------------------------------------------------------
+def validar_email(email):
+    padrao = r'^[\w\.-]+@[\w\.-]+\.\w+$'
+    return re.match(padrao, email) is not None
 
 # ---------------------------------------------------------
 # CONFIGURAÇÃO E PERSISTÊNCIA DE DADOS
@@ -62,29 +70,57 @@ if st.session_state.etapa == "apresentacao":
     st.write("---")
     st.subheader("📝 Informe seus dados para calcular sua meta")
     
+    email_input = st.text_input("Seu e-mail:", value=st.session_state.get("temp_email", ""))
+    
+    peso_anterior = None
+    nome_anterior = ""
+    
+    if email_input and validar_email(email_input):
+        if "historico_perfis" not in st.session_state:
+            st.session_state.historico_perfis = {}
+            
+        if email_input in st.session_state.historico_perfis:
+            p_dados = st.session_state.historico_perfis[email_input]
+            nome_anterior = p_dados.get("nome", "")
+            peso_anterior = p_dados.get("peso", None)
+
     with st.form("form_cadastro"):
-        nome = st.text_input("Seu nome:")
-        email = st.text_input("Seu e-mail:")
-        peso = st.number_input("Seu peso (kg):", min_value=1.0, max_value=200.0, value=70.0, step=0.5)
-        altura = st.number_input("Sua altura (m):", min_value=0.5, max_value=2.5, value=1.70, step=0.01)
+        nome = st.text_input("Seu nome:", value=nome_anterior)
+        
+        val_peso_inicial = float(peso_anterior) if peso_anterior is not None else None
+        
+        peso = st.number_input("Seu peso (kg) *obrigatório:", min_value=1.0, max_value=300.0, value=val_peso_inicial, step=0.5, placeholder="Ex: 70.0")
         
         botao_calcular = st.form_submit_button("Calcular Volume Ideal 🧮")
         
         if botao_calcular:
             if not nome.strip():
                 st.error("Por favor, preencha o seu nome para continuar.")
+            elif not email_input.strip():
+                st.error("Por favor, preencha o seu e-mail (campo obrigatório).")
+            elif not validar_email(email_input):
+                st.error("Por favor, insira um e-mail válido (exemplo: usuario@email.com).")
+            elif peso is None or peso <= 0:
+                st.error("Por favor, informe o seu peso para calcular a meta (campo obrigatório).")
             else:
-                meta_ideal_ml = peso * 35       
+                meta_ideal_ml = peso * 35      
                 limite_maximo_ml = peso * 70    
                 
+                if "historico_perfis" not in st.session_state:
+                    st.session_state.historico_perfis = {}
+                    
+                st.session_state.historico_perfis[email_input] = {
+                    "nome": nome,
+                    "peso": peso
+                }
+
                 st.session_state.dados_usuario = {
                     "nome": nome,
-                    "email": email,
+                    "email": email_input,
                     "peso": peso,
-                    "altura": altura,
                     "meta_ml": meta_ideal_ml,
                     "limite_max_ml": limite_maximo_ml,
-                    "ativo_lembretes": True,
+                    "ativo_fracionamento": True,
                     "qtd_vezes": 8,
                     "unidade_tempo": "Horas",
                     "valor_intervalo": 2,
@@ -119,32 +155,44 @@ elif st.session_state.etapa == "calculo_feito":
             st.rerun()
 
 # ---------------------------------------------------------
-# ETAPA 3: CONFIGURAÇÃO DE ALARME / LEMBRETES
+# ETAPA 3: CONFIGURAÇÃO DE FRACIONAMENTO E METAS
 # ---------------------------------------------------------
 elif st.session_state.etapa == "configurar_lembretes":
     dados = st.session_state.dados_usuario
-    st.title("⏰ Configuração de Alarme e Lembretes")
-    st.write("Deseja configurar alertas e lembretes periódicos para te ajudar a lembrar de beber água ao longo do dia?")
+    st.title("📊 Configuração de Fracionamento e Frequência")
+    st.write("Deseja planejar como prefere fracionar o seu consumo de água ao longo das horas do dia para facilitar sua rotina?")
     
-    ativar_lembretes = st.checkbox("Sim, quero ativar lembretes de rotina", value=dados.get("ativo_lembretes", True))
+    ativar_fracionamento = st.checkbox("Sim, quero ativar o plano de fracionamento", value=dados.get("ativo_fracionamento", True))
     
-    st.write("---")
-    st.markdown("### ⚙️ Detalhes do Alarme")
-    qtd_vezes_desejada = st.number_input("Quantas vezes por dia quer ser lembrado de beber água?", min_value=1, max_value=48, value=int(dados.get("qtd_vezes", 8)), step=1)
-    
-    col_t1, col_t2 = st.columns(2)
-    with col_t1:
-        unidade_tempo = st.selectbox("Unidade de Intervalo:", ["Horas", "Minutos"], index=0 if dados.get("unidade_tempo", "Horas") == "Horas" else 1)
-    with col_t2:
-        if unidade_tempo == "Horas":
-            valor_intervalo = st.number_input("Intervalo em Horas:", min_value=1, max_value=24, value=int(dados.get("valor_intervalo", 2)), step=1)
-        else:
-            valor_intervalo = st.number_input("Intervalo em Minutos:", min_value=1, max_value=59, value=int(dados.get("valor_intervalo", 30)), step=1)
-    
+    qtd_vezes_desejada = int(dados.get("qtd_vezes", 8))
+    unidade_tempo = dados.get("unidade_tempo", "Horas")
+    valor_intervalo = int(dados.get("valor_intervalo", 2))
+
+    if ativar_fracionamento:
+        st.write("---")
+        st.markdown("### ⚙ Detalhes do Fracionamento")
+        qtd_vezes_desejada = st.number_input("Quantas vezes por dia você planeja beber água?", min_value=1, max_value=24, value=qtd_vezes_desejada, step=1)
+        
+        col_t1, col_t2 = st.columns(2)
+        with col_t1:
+            unidade_tempo = st.selectbox("Unidade de Intervalo:", ["Horas", "Minutos"], index=0 if unidade_tempo == "Horas" else 1)
+        with col_t2:
+            if unidade_tempo == "Horas":
+                valor_intervalo = st.number_input("Intervalo em Horas:", min_value=1, max_value=24, value=valor_intervalo, step=1)
+            else:
+                valor_intervalo = st.number_input("Intervalo em Minutos:", min_value=1, max_value=59, value=30, step=1)
+        
+        tempo_total_estimado = (qtd_vezes_desejada * valor_intervalo) if unidade_tempo == "Horas" else (qtd_vezes_desejada * (valor_intervalo / 60))
+        if tempo_total_estimado > 24:
+            st.warning(f"⚠️ Atenção: A combinação de {qtd_vezes_desejada} vezes a cada {valor_intervalo} {unidade_tempo.lower()} resulta em um ciclo superior a 24 horas ({tempo_total_estimado:.1f}h). Ajuste os valores para caber no seu dia!")
+
     st.write("")
-    if st.button("Ir para o Painel Principal 🚀", use_container_width=True):
-        volume_por_dose_ml = dados["meta_ml"] / qtd_vezes_desejada
-        st.session_state.dados_usuario["ativo_lembretes"] = ativar_lembretes
+    texto_botao = "Ir para o Painel Principal 🚀" if ativar_fracionamento else "Prosseguir sem Fracionamento 🚀"
+    
+    if st.button(texto_botao, use_container_width=True):
+        volume_por_dose_ml = dados["meta_ml"] / qtd_vezes_desejada if ativar_fracionamento else 0
+        
+        st.session_state.dados_usuario["ativo_fracionamento"] = ativar_fracionamento
         st.session_state.dados_usuario["qtd_vezes"] = qtd_vezes_desejada
         st.session_state.dados_usuario["unidade_tempo"] = unidade_tempo
         st.session_state.dados_usuario["valor_intervalo"] = valor_intervalo
@@ -173,7 +221,6 @@ elif st.session_state.etapa == "principal":
     meta_diaria_ml = dados["meta_ml"]
     limite_max_ml = dados["limite_max_ml"]
     
-    # Barra lateral limpa contendo apenas o Menu e a Navegação Rápida
     with st.sidebar:
         st.header("⚙️ Menu de Navegação")
         pagina_selecionada = st.radio("Escolha a Visualização:", ["🏠 Painel Diário", "📈 Relatório Mensal"])
@@ -181,7 +228,7 @@ elif st.session_state.etapa == "principal":
         st.write("---")
         st.markdown("### 🔄 Navegação Rápida")
         
-        if st.button("⏰ Voltar para Alarmes", use_container_width=True):
+        if st.button("⏰ Voltar para Configurações", use_container_width=True):
             st.session_state.etapa = "configurar_lembretes"
             st.rerun()
             
@@ -195,7 +242,6 @@ elif st.session_state.etapa == "principal":
     if pagina_selecionada == "🏠 Painel Diário":
         st.title(f"💧 Daily Water - Painel de {nome_usuario}")
 
-        # Informações de Perfil e Alertas exibidas diretamente na tela
         st.write("---")
         col_info1, col_info2 = st.columns(2)
         
@@ -207,14 +253,14 @@ elif st.session_state.etapa == "principal":
             st.write(f"**Limite Máximo:** {limite_max_ml / 1000:.2f} L")
             
         with col_info2:
-            st.markdown("### ⏰ Alertas e Lembretes")
-            if dados.get("ativo_lembretes", True):
+            st.markdown("### 📊 Plano de Fracionamento")
+            if dados.get("ativo_fracionamento", True):
                 st.write("• **Status:** Ativado ✅")
                 st.write(f"• **Frequência:** {dados['qtd_vezes']}x ao dia")
                 st.write(f"• **Intervalo:** A cada {dados['valor_intervalo']} {dados['unidade_tempo'].lower()}")
                 st.write(f"• **Alvo por dose:** ~{dados['volume_dose']:.0f} mL")
             else:
-                st.write("• **Status:** Desativado 🔕")
+                st.write("• **Status:** Modo Manual (Desativado) 🔕")
 
         st.write("---")
         st.subheader("📅 Selecione a Data do Registro")
@@ -240,54 +286,98 @@ elif st.session_state.etapa == "principal":
         if total_consumido_dia > limite_max_ml:
             st.error(f"⚠️ **Atenção ao Excesso!** Você ultrapassou o limite máximo recomendado de **{limite_max_ml / 1000:.2f} L** para o seu peso.")
 
-        if dados.get("ativo_lembretes", True):
-            st.info(f"💡 **Lembrete de Hidratação:** Tente beber aproximadamente **{dados['volume_dose']:.0f} mL** a cada **{dados['valor_intervalo']} {dados['unidade_tempo'].lower()}**.")
-
         chave_dia_str = str(data_selecionada)
         dia_fechado = st.session_state.dias_fechados.get(chave_dia_str, False)
 
         st.write("---")
-        st.subheader("🥤 Registrar Nova Ingestão de Água")
+        
+        usa_fracionamento = dados.get("ativo_fracionamento", True)
 
         if dia_fechado:
             st.info("🔒 Este dia está fechado. Reabra o dia no final da página para adicionar registros.")
+        elif usa_fracionamento:
+            st.subheader("🎯 Registro Rápido do Plano de Fracionamento")
+            st.write(f"Com base no seu plano, sugerimos registrar doses de aprox. **{dados['volume_dose']:.0f} mL**:")
+
+            col_d1, col_d2 = st.columns(2)
+            with col_d1:
+                volume_padrao = float(dados['volume_dose'])
+                hora_atual_padrao = datetime.now().strftime("%H:%M")
+                if st.button(f"➕ Registrar Dose Rápida ({volume_padrao:.0f} mL)", use_container_width=True):
+                    salvar_registro(data_selecionada, nome_usuario, "Dose Planejada", volume_padrao, hora_atual_padrao)
+                    st.success(f"Dose de {volume_padrao:.0f} mL registrada com sucesso!")
+                    st.rerun()
+
+            with col_d2:
+                with st.expander("🥤 Registrar outro volume personalizado"):
+                    with st.form("form_personalizado_plano", clear_on_submit=True):
+                        tipo_recipiente = st.selectbox("Tipo:", ["Copo", "Garrafa", "Jarra", "Outros"])
+                        qtd_pers = st.number_input("Quantidade (mL):", min_value=10.0, max_value=5000.0, value=250.0, step=10.0)
+                        hora_pers = st.text_input("Hora:", value=datetime.now().strftime("%H:%M"))
+                        if st.form_submit_button("Adicionar Personalizado"):
+                            salvar_registro(data_selecionada, nome_usuario, tipo_recipiente, qtd_pers, hora_pers)
+                            st.success("Registrado com sucesso!")
+                            st.rerun()
         else:
-            with st.form("form_registro_agua", clear_on_submit=True):
+            st.subheader("🥤 Registrar Nova Ingestão de Água (Modo Manual)")
+            with st.form("form_registro_agua_manual", clear_on_submit=True):
                 col_f1, col_f2, col_f3, col_f4 = st.columns(4)
                 with col_f1:
                     tipo_recipiente = st.selectbox("Tipo:", ["Copo", "Garrafa", "Jarra", "Outros"])
                 with col_f2:
                     unidade_medida = st.selectbox("Volume:", ["mL", "Litros"])
                 with col_f3:
-                    valor_padrao_dose = float(dados['volume_dose']) if dados.get("ativo_lembretes", True) else 250.0
-                    quantidade_valor = st.number_input("Quantidade:", min_value=1.0, max_value=5000.0, value=valor_padrao_dose, step=10.0)
+                    quantidade_valor = st.number_input("Quantidade:", min_value=1.0, max_value=5000.0, value=250.0, step=10.0)
                 with col_f4:
-                    hora_atual_padrao = datetime.now().strftime("%H:%M")
-                    hora_registro = st.text_input("Hora:", value=hora_atual_padrao)
-                    
-                botao_salvar_copo = st.form_submit_button("➕ Adicionar à Contagem")
+                    hora_registro = st.text_input("Hora:", value=datetime.now().strftime("%H:%M"))
                 
-                if botao_salvar_copo:
+                if st.form_submit_button("➕ Adicionar à Contagem"):
                     volume_final_ml = quantidade_valor * 1000 if unidade_medida == "Litros" else quantidade_valor
                     salvar_registro(data_selecionada, nome_usuario, tipo_recipiente, volume_final_ml, hora_registro)
-                    st.success(f"Registrado com sucesso: {quantidade_valor} {unidade_medida} ({tipo_recipiente}) às {hora_registro}!")
+                    st.success("Registrado com sucesso!")
                     st.rerun()
 
         st.write("---")
-        st.subheader(f"📋 Histórico de Consumo do Dia ({data_selecionada.strftime('%d/%m/%Y')})")
+        st.subheader(f"📋 Histórico e Gerenciamento do Dia ({data_selecionada.strftime('%d/%m/%Y')})")
         
         if not df_dia.empty:
-            df_exibicao = df_dia[["Hora", "Tipo", "Volume_mL"]].copy()
-            df_exibicao.columns = ["Horário", "Recipiente", "Volume (mL)"]
-            st.dataframe(df_exibicao, use_container_width=True, hide_index=True)
-            
             if not dia_fechado:
-                if st.button("🗑️ Limpar registros deste dia"):
-                    df_geral = carregar_historico()
-                    df_atualizado = df_geral[~((df_geral["Nome"].astype(str).str.lower() == nome_usuario.lower()) & (df_geral["Data"] == str(data_selecionada)))]
-                    df_atualizado.to_csv(ARQUIVO_HISTORICO, index=False)
-                    st.success("Registros do dia limpos com sucesso!")
-                    st.rerun()
+                st.write("Selecione abaixo os registros que deseja excluir individualmente ou limpe todos do dia:")
+                
+                indices_para_remover = []
+                
+                for idx, row in df_dia.iterrows():
+                    col_chk, col_det = st.columns([1, 6])
+                    with col_chk:
+                        marcado = st.checkbox("Excluir", key=f"chk_{idx}")
+                        if marcado:
+                            indices_para_remover.append(idx)
+                    with col_det:
+                        st.write(f"🕒 **{row['Hora']}** — 🥤 **{row['Tipo']}**: `{row['Volume_mL']} mL`")
+                
+                st.write("")
+                col_ex1, col_ex2 = st.columns(2)
+                with col_ex1:
+                    if st.button("🗑️ Excluir Selecionados", use_container_width=True):
+                        if indices_para_remover:
+                            df_geral = carregar_historico()
+                            df_atualizado = df_geral.drop(indices_para_remover)
+                            df_atualizado.to_csv(ARQUIVO_HISTORICO, index=False)
+                            st.success("Registros selecionados excluídos com sucesso!")
+                            st.rerun()
+                        else:
+                            st.warning("Nenhum registro foi selecionado para exclusão.")
+                with col_ex2:
+                    if st.button("🧹 Excluir Todos do Dia", use_container_width=True):
+                        df_geral = carregar_historico()
+                        df_atualizado = df_geral[~((df_geral["Nome"].astype(str).str.lower() == nome_usuario.lower()) & (df_geral["Data"] == str(data_selecionada)))]
+                        df_atualizado.to_csv(ARQUIVO_HISTORICO, index=False)
+                        st.success("Todos os registros do dia foram limpos!")
+                        st.rerun()
+            else:
+                df_exibicao = df_dia[["Hora", "Tipo", "Volume_mL"]].copy()
+                df_exibicao.columns = ["Horário", "Recipiente", "Volume (mL)"]
+                st.dataframe(df_exibicao, use_container_width=True, hide_index=True)
         else:
             st.info("Nenhum consumo registrado para esta data ainda.")
 
@@ -420,6 +510,9 @@ elif st.session_state.etapa == "principal":
             
             if st.button("📤 Enviar Relatório por E-mail", use_container_width=True):
                 if not input_email.strip():
-                    st.error("Por favor, preencha um e-mail válido.")
+                    st.error("Por favor, preencha um e-mail.")
+                elif not validar_email(input_email):
+                    st.error("O e-mail informado não possui um formato válido (exemplo: usuario@email.com). Verifique e tente novamente.")
                 else:
+                    st.session_state.dados_usuario["email"] = input_email
                     st.success(f"Sucesso! O resumo consolidado do mês **{mes_selecionado}** foi disparado com sucesso para o e-mail **{input_email}**! 🚀")
