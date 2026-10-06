@@ -29,6 +29,9 @@ O projeto foi construído utilizando as seguintes tecnologias:
 O aplicativo está hospedado e disponível publicamente na nuvem através do Streamlit Community Cloud:  
 👉 [Acesse o Daily Water aqui](https://daily-water-4ktnvczar6caen2hcffvy4.streamlit.app/)
 
+## Video Youtube
+👉 [Acesse o Daily Water aqui]([https://daily-water-4ktnvczar6caen2hcffvy4.streamlit.app/](https://www.youtube.com/watch?v=dma_gmlrlpU))
+
 ---
 
 ## 💻 Como Executar o Projeto Localmente
